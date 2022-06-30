@@ -37,6 +37,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.ref.WeakReference;
 
+import androidx.annotation.FloatRange;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -52,6 +53,8 @@ import androidx.viewpager.widget.ViewPager;
 import androidx.viewpager2.widget.ViewPager2;
 
 import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 /**
  * An interaction behavior plugin for a child view of {@link CoordinatorLayout} to make it work as
@@ -68,9 +71,9 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
          * Called when the bottom sheet changes its state.
          *
          * @param bottomSheet The bottom sheet view.
-         * @param newState    The new state. This will be one of {@link #STATE_DRAGGING},
-         *                    {@link #STATE_SETTLING}, {@link #STATE_EXPANDED},
-         *                    {@link #STATE_COLLAPSED}, or {@link #STATE_HIDDEN}.
+         * @param newState The new state. This will be one of {@link #STATE_DRAGGING},
+         * {@link #STATE_SETTLING}, {@link #STATE_EXPANDED},
+         * {@link #STATE_COLLAPSED}, or {@link #STATE_HIDDEN}.
          */
         public abstract void onStateChanged(@NonNull View bottomSheet, @State int newState);
 
@@ -79,9 +82,9 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
          *
          * @param bottomSheet The bottom sheet view.
          * @param slideOffset The new offset of this bottom sheet within [-1,1] range. Offset
-         *                    increases as this bottom sheet is moving upward. From 0 to 1 the sheet
-         *                    is between collapsed and expanded states and from -1 to 0 it is
-         *                    between hidden and collapsed states.
+         * increases as this bottom sheet is moving upward. From 0 to 1 the sheet
+         * is between collapsed and expanded states and from -1 to 0 it is
+         * between hidden and collapsed states.
          */
         public abstract void onSlide(@NonNull View bottomSheet, float slideOffset);
     }
@@ -111,11 +114,14 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
      */
     public static final int STATE_HIDDEN = 5;
 
+    /** The bottom sheet is half-expanded (used when mFitToContents is false). */
+    public static final int STATE_HALF_EXPANDED = 6;
+
     /**
      * @hide
      */
     @RestrictTo(LIBRARY_GROUP)
-    @IntDef({STATE_EXPANDED, STATE_COLLAPSED, STATE_DRAGGING, STATE_SETTLING, STATE_HIDDEN})
+    @IntDef({STATE_EXPANDED, STATE_COLLAPSED, STATE_DRAGGING, STATE_SETTLING, STATE_HIDDEN, STATE_HALF_EXPANDED})
     @Retention(RetentionPolicy.SOURCE)
     public @interface State {
     }
@@ -142,6 +148,12 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
 
     private int mPeekHeightMin;
 
+    int halfExpandedOffset;
+
+    float halfExpandedRatio = 0.7f;
+
+    int collapsedOffset;
+
     int mMinOffset;
 
     int mMaxOffset;
@@ -157,9 +169,13 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
 
     private boolean mIgnoreEvents;
 
+    private int lastNestedScrollDy;
+
     private boolean mNestedScrolled;
 
+    int mParentWidth;
     int mParentHeight;
+    private int childHeight;
 
     WeakReference<V> mViewRef;
 
@@ -185,7 +201,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
      * Default constructor for inflating ViewPagerBottomSheetBehaviors from layout.
      *
      * @param context The {@link Context}.
-     * @param attrs   The {@link AttributeSet}.
+     * @param attrs The {@link AttributeSet}.
      */
     public ViewPagerBottomSheetBehavior2(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -233,7 +249,9 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         // First let the parent lay it out
         parent.onLayoutChild(child, layoutDirection);
         // Offset the bottom sheet
+        mParentWidth = parent.getWidth();
         mParentHeight = parent.getHeight();
+        childHeight = child.getHeight();
         int peekHeight;
         if (mPeekHeightAuto) {
             if (mPeekHeightMin == 0) {
@@ -246,8 +264,13 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         }
         mMinOffset = Math.max(0, mParentHeight - child.getHeight());
         mMaxOffset = Math.max(mParentHeight - peekHeight, mMinOffset);
+        calculateHalfExpandedOffset();
+        calculateCollapsedOffset();
+
         if (mState == STATE_EXPANDED) {
             ViewCompat.offsetTopAndBottom(child, mMinOffset);
+        } else if (mState == STATE_HALF_EXPANDED) {
+            ViewCompat.offsetTopAndBottom(child, halfExpandedOffset);
         } else if (mHideable && mState == STATE_HIDDEN) {
             ViewCompat.offsetTopAndBottom(child, mParentHeight);
         } else if (mState == STATE_COLLAPSED) {
@@ -293,13 +316,13 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
                 int initialX = (int) event.getX();
                 mInitialY = (int) event.getY();
                 View scroll = mNestedScrollingChildRef != null
-                        ? mNestedScrollingChildRef.get() : null;
+                                      ? mNestedScrollingChildRef.get() : null;
                 if (scroll != null && parent.isPointInChildBounds(scroll, initialX, mInitialY)) {
                     mActivePointerId = event.getPointerId(event.getActionIndex());
                     mTouchingScrollingChild = true;
                 }
                 mIgnoreEvents = mActivePointerId == MotionEvent.INVALID_POINTER_ID &&
-                        !parent.isPointInChildBounds(child, initialX, mInitialY);
+                                        !parent.isPointInChildBounds(child, initialX, mInitialY);
                 break;
         }
         if (!mIgnoreEvents && mViewDragHelper.shouldInterceptTouchEvent(event)) {
@@ -310,9 +333,9 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         // happening over the scrolling content as nested scrolling logic handles that case.
         View scroll = mNestedScrollingChildRef.get();
         return action == MotionEvent.ACTION_MOVE && scroll != null &&
-                !mIgnoreEvents && mState != STATE_DRAGGING &&
-                !parent.isPointInChildBounds(scroll, (int) event.getX(), (int) event.getY()) &&
-                Math.abs(mInitialY - event.getY()) > mViewDragHelper.getTouchSlop();
+                       !mIgnoreEvents && mState != STATE_DRAGGING &&
+                       !parent.isPointInChildBounds(scroll, (int) event.getX(), (int) event.getY()) &&
+                       Math.abs(mInitialY - event.getY()) > mViewDragHelper.getTouchSlop();
     }
 
     @Override
@@ -395,7 +418,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
             return;
         }
         if (mNestedScrollingChildRef == null || target != mNestedScrollingChildRef.get()
-                || !mNestedScrolled) {
+                    || !mNestedScrolled) {
             return;
         }
 
@@ -406,22 +429,49 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         int top;
         int targetState;
         if (yVel < 0 && Math.abs(yVel) > mMinimumVelocity && Math.abs(yVel) > Math.abs(xVel)) {
-            top = mMinOffset;
-            targetState = STATE_EXPANDED;
-        } else if (mHideable && shouldHide(child, yVel)) {
+            int currentTop = child.getTop();
+            if (currentTop > halfExpandedOffset) {
+                top = halfExpandedOffset;
+                targetState = STATE_HALF_EXPANDED;
+            } else {
+                top = mMinOffset;
+                targetState = STATE_EXPANDED;
+            }
+        }
+//        if (yVel < 0 && Math.abs(yVel) > mMinimumVelocity && Math.abs(yVel) > Math.abs(xVel)) {
+//            top = mMinOffset;
+//            targetState = STATE_EXPANDED;
+//        }
+        else if (mHideable && shouldHide(child, yVel)) {
             top = mParentHeight;
             targetState = STATE_HIDDEN;
         } else if (yVel > 0 && Math.abs(yVel) > mMinimumVelocity && Math.abs(yVel) > Math.abs(xVel)) {
-            top = mMaxOffset;
-            targetState = STATE_COLLAPSED;
-        } else {
-            // not scrolling much, i.e. stationary
             int currentTop = child.getTop();
-            if (Math.abs(currentTop - mMinOffset) < Math.abs(currentTop - mMaxOffset)) {
-                top = mMinOffset;
-                targetState = STATE_EXPANDED;
+            if (currentTop < halfExpandedOffset) {
+                if (currentTop < Math.abs(currentTop - collapsedOffset)) {
+                    top = mMinOffset;
+                    targetState = STATE_EXPANDED;
+                } else {
+                    top = halfExpandedOffset;
+                    targetState = STATE_HALF_EXPANDED;
+                }
             } else {
-                top = mMaxOffset;
+                if (Math.abs(currentTop - halfExpandedOffset) < Math.abs(currentTop - collapsedOffset)) {
+                    top = halfExpandedOffset;
+                    targetState = STATE_HALF_EXPANDED;
+                } else {
+                    top = mMaxOffset;
+                    targetState = STATE_COLLAPSED;
+                }
+            }
+        } else {
+            // Settle to nearest height.
+            int currentTop = child.getTop();
+            if (Math.abs(currentTop - halfExpandedOffset) < Math.abs(currentTop - collapsedOffset)) {
+                top = halfExpandedOffset;
+                targetState = STATE_HALF_EXPANDED;
+            } else {
+                top = collapsedOffset;
                 targetState = STATE_COLLAPSED;
             }
         }
@@ -435,17 +485,36 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         mNestedScrolled = false;
     }
 
+    private void calculateCollapsedOffset() {
+        int peek = calculatePeekHeight();
+
+            collapsedOffset = mParentHeight - peek;
+    }
+
+    private int calculatePeekHeight() {
+        if (mPeekHeightAuto) {
+            int desiredHeight = max(mPeekHeightMin, mParentHeight - mParentWidth * 9 / 16);
+            return min(desiredHeight, childHeight);
+        }
+        // Only make sure the peek height is above the gesture insets if we're not applying system
+        // insets.
+//        if (!gestureInsetBottomIgnored && !paddingBottomSystemWindowInsets && gestureInsetBottom > 0) {
+//            return max(peekHeight, gestureInsetBottom + peekHeightGestureInsetBuffer);
+//        }
+        return mPeekHeight;
+    }
+
     @Override
     public boolean onNestedPreFling(@NotNull CoordinatorLayout coordinatorLayout, @NotNull V child, @NotNull View target,
                                     float velocityX, float velocityY) {
         return target == mNestedScrollingChildRef.get() &&
-                (mState != STATE_EXPANDED ||
-                        super.onNestedPreFling(coordinatorLayout, child, target,
-                                velocityX, velocityY));
+                       (mState != STATE_EXPANDED ||
+                                super.onNestedPreFling(coordinatorLayout, child, target,
+                                        velocityX, velocityY));
     }
 
     public void invalidateScrollingChild() {
-        if (mViewRef==null) {
+        if (mViewRef == null) {
             return;
         }
         final View scrollingChild = findScrollingChild(mViewRef.get());
@@ -456,8 +525,8 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
      * Sets the height of the bottom sheet when it is collapsed.
      *
      * @param peekHeight The height of the collapsed bottom sheet in pixels, or
-     *                   {@link #PEEK_HEIGHT_AUTO} to configure the sheet to peek automatically
-     *                   at 16:9 ratio keyline.
+     * {@link #PEEK_HEIGHT_AUTO} to configure the sheet to peek automatically
+     * at 16:9 ratio keyline.
      * @attr ref android.support.design.R.styleable#BottomSheetBehavior_Layout_behavior_peekHeight
      */
     public final void setPeekHeight(int peekHeight) {
@@ -473,23 +542,64 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
             mMaxOffset = mParentHeight - peekHeight;
             layout = true;
         }
-        if (layout && mState == STATE_COLLAPSED && mViewRef != null) {
-            V view = mViewRef.get();
-            if (view != null) {
-                view.requestLayout();
+        if (layout &&  mViewRef != null) {
+            updatePeekHeight();
+        }
+    }
+
+    private void updatePeekHeight() {
+        if (mViewRef != null) {
+            calculateCollapsedOffset();
+            if (mState == STATE_COLLAPSED) {
+                V view = mViewRef.get();
+                if (view != null) {
+//                    if (animate) {
+//                        settleToStatePendingLayout(state);
+//                    } else {
+                        view.requestLayout();
+//                    }
+                }
             }
         }
     }
+
 
     /**
      * Gets the height of the bottom sheet when it is collapsed.
      *
      * @return The height of the collapsed bottom sheet in pixels, or {@link #PEEK_HEIGHT_AUTO}
      * if the sheet is configured to peek automatically at 16:9 ratio keyline
+     *
      * @attr ref android.support.design.R.styleable#BottomSheetBehavior_Layout_behavior_peekHeight
      */
     public final int getPeekHeight() {
         return mPeekHeightAuto ? PEEK_HEIGHT_AUTO : mPeekHeight;
+    }
+
+    /**
+     * Determines the height of the BottomSheet in the {@link #STATE_HALF_EXPANDED} state. The
+     * material guidelines recommended a value of 0.5, which results in the sheet filling half of the
+     * parent. The height of the BottomSheet will be smaller as this ratio is decreased and taller as
+     * it is increased. The default value is 0.5.
+     *
+     * @param ratio a float between 0 and 1, representing the {@link #STATE_HALF_EXPANDED} ratio.
+     * @attr ref
+     *     com.google.android.material.R.styleable#BottomSheetBehavior_Layout_behavior_halfExpandedRatio
+     */
+    public void setHalfExpandedRatio(@FloatRange(from = 0.0f, to = 1.0f) float ratio) {
+
+        if ((ratio <= 0) || (ratio >= 1)) {
+            throw new IllegalArgumentException("ratio must be a float value between 0 and 1");
+        }
+        this.halfExpandedRatio = ratio;
+        // If sheet is already laid out, recalculate the half expanded offset based on new setting.
+        // Otherwise, let onLayoutChild handle this later.
+        if (mViewRef != null) {
+            calculateHalfExpandedOffset();
+        }
+    }
+    private void calculateHalfExpandedOffset() {
+        this.halfExpandedOffset = (int) (mParentHeight * (1 - halfExpandedRatio));
     }
 
     /**
@@ -506,6 +616,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
      * Gets whether this bottom sheet can hide when it is swiped down.
      *
      * @return {@code true} if this bottom sheet can hide.
+     *
      * @attr ref android.support.design.R.styleable#BottomSheetBehavior_Layout_behavior_hideable
      */
     public boolean isHideable() {
@@ -528,6 +639,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
      * after it is expanded once.
      *
      * @return Whether the bottom sheet should skip the collapsed state.
+     *
      * @attr ref android.support.design.R.styleable#BottomSheetBehavior_Layout_behavior_skipCollapsed
      */
     public boolean getSkipCollapsed() {
@@ -548,7 +660,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
      * animation.
      *
      * @param state One of {@link #STATE_COLLAPSED}, {@link #STATE_EXPANDED}, or
-     *              {@link #STATE_HIDDEN}.
+     * {@link #STATE_HIDDEN}.
      */
     public final void setState(final @State int state) {
         if (state == mState) {
@@ -557,7 +669,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         if (mViewRef == null) {
             // The view is not laid out yet; modify mState and let onLayoutChild handle it later
             if (state == STATE_COLLAPSED || state == STATE_EXPANDED ||
-                    (mHideable && state == STATE_HIDDEN)) {
+                        (mHideable && state == STATE_HIDDEN)) {
                 mState = state;
             }
             return;
@@ -791,7 +903,7 @@ public class ViewPagerBottomSheetBehavior2<V extends View> extends CoordinatorLa
         if (bottomSheet != null && mCallback != null) {
             if (top > mMaxOffset) {
                 mCallback.onSlide(bottomSheet, (float) (mMaxOffset - top) /
-                        (mParentHeight - mMaxOffset));
+                                                       (mParentHeight - mMaxOffset));
             } else {
                 mCallback.onSlide(bottomSheet,
                         (float) (mMaxOffset - top) / ((mMaxOffset - mMinOffset)));
