@@ -2,38 +2,64 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:background="@color/teal_200"
-    android:layout_height="match_parent"
     android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/teal_200"
     app:layout_behavior="com.imxie.exvpbs.ViewPagerBottomSheetBehavior"
     tools:context=".SecondFragment">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/second_bottom_sheet"
-        android:layout_height="match_parent"
         android:layout_width="match_parent"
-        app:behavior_peekHeight="100dp"
+        android:layout_height="match_parent"
         android:background="@color/design_default_color_primary"
-        app:layout_behavior="@string/bottom_sheet_behavior">
+        app:behavior_peekHeight="100dp"
+        app:layout_behavior=".ViewPagerBottomSheetBehavior2">
 
         <Button
             android:id="@+id/button_second"
-            android:layout_height="wrap_content"
             android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="@string/previous"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/textview_second" />
 
         <TextView
             android:id="@+id/textview_second"
-            android:layout_height="wrap_content"
             android:layout_width="wrap_content"
-            app:layout_constraintBottom_toTopOf="@id/button_second"
+            android:layout_height="wrap_content"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/second_tab"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/button_second">
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="たぶいち" />
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="たぶに" />
+        </com.google.android.material.tabs.TabLayout>
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/second_view_pager"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/second_tab" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
