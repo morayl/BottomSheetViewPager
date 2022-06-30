@@ -16,12 +16,6 @@
 
 package com.morayl.bottomsheetviewpager;
 
-import com.google.android.material.R;
-
-import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
-import static java.lang.Math.max;
-import static java.lang.Math.min;
-
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.content.Context;
@@ -32,11 +26,6 @@ import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Parcel;
 import android.os.Parcelable;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat;
-import androidx.core.view.accessibility.AccessibilityViewCommand;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -47,6 +36,21 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.accessibility.AccessibilityEvent;
+
+import com.google.android.material.R;
+import com.google.android.material.internal.ViewUtils;
+import com.google.android.material.internal.ViewUtils.RelativePadding;
+import com.google.android.material.resources.MaterialResources;
+import com.google.android.material.shape.MaterialShapeDrawable;
+import com.google.android.material.shape.ShapeAppearanceModel;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
 import androidx.annotation.FloatRange;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
@@ -58,19 +62,19 @@ import androidx.annotation.VisibleForTesting;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams;
 import androidx.core.math.MathUtils;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat;
+import androidx.core.view.accessibility.AccessibilityViewCommand;
 import androidx.customview.view.AbsSavedState;
 import androidx.customview.widget.ViewDragHelper;
-import com.google.android.material.internal.ViewUtils;
-import com.google.android.material.internal.ViewUtils.RelativePadding;
-import com.google.android.material.resources.MaterialResources;
-import com.google.android.material.shape.MaterialShapeDrawable;
-import com.google.android.material.shape.ShapeAppearanceModel;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
+
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 /**
  * An interaction behavior plugin for a child view of {@link CoordinatorLayout} to make it work as a
@@ -805,6 +809,15 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
     updateAccessibilityActions();
   }
 
+  public void invalidateScrollingChild() {
+    Log.d("Footprint", "invalidateScrollingChild: " + viewRef);
+    if (viewRef==null) {
+      return;
+    }
+    final View scrollingChild = findScrollingChild(viewRef.get());
+    nestedScrollingChildRef = new WeakReference<>(scrollingChild);
+  }
+
   /**
    * Sets the maximum width of the bottom sheet. The layout will be at most this dimension wide.
    * This method should be called before {@link BottomSheetDialog#show()} in order for the width to
@@ -1292,7 +1305,14 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
     if (ViewCompat.isNestedScrollingEnabled(view)) {
       return view;
     }
-    if (view instanceof ViewGroup) {
+
+    if (view instanceof ViewPager2) {
+      ViewPager2 viewPager2 = (ViewPager2) view;
+      View currentViewPagerChild = getCurrentViewWithVP2(viewPager2);
+      if (currentViewPagerChild != null) {
+        return findScrollingChild(currentViewPagerChild);
+      }
+    } else if (view instanceof ViewGroup) {
       ViewGroup group = (ViewGroup) view;
       for (int i = 0, count = group.getChildCount(); i < count; i++) {
         View scrollingChild = findScrollingChild(group.getChildAt(i));
@@ -1302,6 +1322,16 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
       }
     }
     return null;
+  }
+
+  @Nullable
+  private View getCurrentViewWithVP2(ViewPager2 viewPager) {
+    final int currentItem = viewPager.getCurrentItem();
+    View child = viewPager.getChildAt(0);
+    if (child instanceof RecyclerView) {
+      child = ((RecyclerView) child).getLayoutManager().findViewByPosition(currentItem);
+    }
+    return child;
   }
 
   private void createMaterialShapeDrawable(
