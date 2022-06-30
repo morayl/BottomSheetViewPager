@@ -10,7 +10,6 @@ import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.tabs.TabLayoutMediator
-import com.imxie.exvpbs.BottomSheetVP2Helper
 import com.morayl.bottomsheetviewpager.databinding.FragmentSecondBinding
 import com.morayl.footprintktx.footprint
 
@@ -54,14 +53,14 @@ class SecondFragment : Fragment() {
         binding.secondViewPager.adapter = vp
         TabLayoutMediator(binding.secondTab, binding.secondViewPager) { tab, position ->
         }.attach()
-        BottomSheetVP2Helper.setupViewPager(binding.secondViewPager)
         val bottomSheet = binding.secondBottomSheet.layoutParams as? CoordinatorLayout.LayoutParams
         footprint(bottomSheet)
-        val behavior = bottomSheet?.behavior as? BottomSheetBehavior<View>
+        val behavior = bottomSheet?.behavior as? ViewPager2BottomSheetBehavior<View>
         footprint(behavior)
         behavior?.isFitToContents = false
         behavior?.halfExpandedRatio = 0.7f
         behavior?.state = BottomSheetBehavior.STATE_HALF_EXPANDED
+        BottomSheetUtils.setupViewPager(binding.secondViewPager)
     }
 
     override fun onDestroyView() {

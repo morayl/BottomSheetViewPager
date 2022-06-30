@@ -13,7 +13,12 @@ class ContentFragment : Fragment(R.layout.fragment_content) {
         super.onViewCreated(view, savedInstanceState)
         val index = requireArguments().getInt("index")
         val groupieAdapter = GroupieAdapter()
-        List(100) { IndexItem(index) }.forEach {
+        val size = if (index == 0) {
+            3
+        } else {
+            100
+        }
+        List(size) { IndexItem(index) }.forEach {
             groupieAdapter.add(it)
         }
         view.findViewById<RecyclerView>(R.id.content_recycler).apply {

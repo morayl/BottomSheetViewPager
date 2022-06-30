@@ -84,7 +84,7 @@ import static java.lang.Math.min;
  * window-like. For BottomSheetDialog use {@link BottomSheetDialog#setTitle(int)}, and for
  * BottomSheetDialogFragment use {@link ViewCompat#setAccessibilityPaneTitle(View, CharSequence)}.
  */
-public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Behavior<V> {
+public class ViewPager2BottomSheetBehavior<V extends View> extends CoordinatorLayout.Behavior<V> {
 
 
   /** Callback for monitoring events about bottom sheets. */
@@ -297,9 +297,9 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
 
   private int expandHalfwayActionId = View.NO_ID;
 
-  public BottomSheetBehavior2() {}
+  public ViewPager2BottomSheetBehavior() {}
 
-  public BottomSheetBehavior2(@NonNull Context context, @Nullable AttributeSet attrs) {
+  public ViewPager2BottomSheetBehavior(@NonNull Context context, @Nullable AttributeSet attrs) {
     super(context, attrs);
 
     peekHeightGestureInsetBuffer =
@@ -1724,7 +1724,7 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
       skipCollapsed = source.readInt() == 1;
     }
 
-    public SavedState(Parcelable superState, @NonNull BottomSheetBehavior2<?> behavior) {
+    public SavedState(Parcelable superState, @NonNull ViewPager2BottomSheetBehavior<?> behavior) {
       super(superState);
       this.state = behavior.state;
       this.peekHeight = behavior.peekHeight;
@@ -1734,12 +1734,12 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
     }
 
     /**
-     * This constructor does not respect flags: {@link BottomSheetBehavior2#SAVE_PEEK_HEIGHT}, {@link
-     * BottomSheetBehavior2#SAVE_FIT_TO_CONTENTS}, {@link BottomSheetBehavior2#SAVE_HIDEABLE}, {@link
-     * BottomSheetBehavior2#SAVE_SKIP_COLLAPSED}. It is as if {@link BottomSheetBehavior2#SAVE_NONE}
+     * This constructor does not respect flags: {@link ViewPager2BottomSheetBehavior#SAVE_PEEK_HEIGHT}, {@link
+     * ViewPager2BottomSheetBehavior#SAVE_FIT_TO_CONTENTS}, {@link ViewPager2BottomSheetBehavior#SAVE_HIDEABLE}, {@link
+     * ViewPager2BottomSheetBehavior#SAVE_SKIP_COLLAPSED}. It is as if {@link ViewPager2BottomSheetBehavior#SAVE_NONE}
      * were set.
      *
-     * @deprecated Use {@link #SavedState(Parcelable, BottomSheetBehavior2)} instead.
+     * @deprecated Use {@link #SavedState(Parcelable, ViewPager2BottomSheetBehavior)} instead.
      */
     @Deprecated
     public SavedState(Parcelable superstate, int state) {
@@ -1780,24 +1780,24 @@ public class BottomSheetBehavior2<V extends View> extends CoordinatorLayout.Beha
   }
 
   /**
-   * A utility function to get the {@link BottomSheetBehavior2} associated with the {@code view}.
+   * A utility function to get the {@link ViewPager2BottomSheetBehavior} associated with the {@code view}.
    *
-   * @param view The {@link View} with {@link BottomSheetBehavior2}.
-   * @return The {@link BottomSheetBehavior2} associated with the {@code view}.
+   * @param view The {@link View} with {@link ViewPager2BottomSheetBehavior}.
+   * @return The {@link ViewPager2BottomSheetBehavior} associated with the {@code view}.
    */
   @NonNull
   @SuppressWarnings("unchecked")
-  public static <V extends View> BottomSheetBehavior2<V> from(@NonNull V view) {
+  public static <V extends View> ViewPager2BottomSheetBehavior<V> from(@NonNull V view) {
     ViewGroup.LayoutParams params = view.getLayoutParams();
     if (!(params instanceof CoordinatorLayout.LayoutParams)) {
       throw new IllegalArgumentException("The view is not a child of CoordinatorLayout");
     }
     CoordinatorLayout.Behavior<?> behavior =
         ((CoordinatorLayout.LayoutParams) params).getBehavior();
-    if (!(behavior instanceof BottomSheetBehavior2)) {
+    if (!(behavior instanceof ViewPager2BottomSheetBehavior)) {
       throw new IllegalArgumentException("The view is not associated with BottomSheetBehavior");
     }
-    return (BottomSheetBehavior2<V>) behavior;
+    return (ViewPager2BottomSheetBehavior<V>) behavior;
   }
 
   /**

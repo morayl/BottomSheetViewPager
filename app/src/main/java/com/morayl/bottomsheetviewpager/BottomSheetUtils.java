@@ -18,11 +18,11 @@ public final class BottomSheetUtils {
 
     private static class BottomSheetViewPagerListener extends ViewPager2.OnPageChangeCallback {
         private final ViewPager2 viewPager;
-        private final BottomSheetBehavior2<View> behavior;
+        private final ViewPager2BottomSheetBehavior<View> behavior;
 
         public BottomSheetViewPagerListener(ViewPager2 viewPager, View bottomSheetParent) {
             this.viewPager = viewPager;
-            this.behavior = BottomSheetBehavior2.from(bottomSheetParent);
+            this.behavior = ViewPager2BottomSheetBehavior.from(bottomSheetParent);
         }
 
         @Override
@@ -35,7 +35,7 @@ public final class BottomSheetUtils {
         View current = view;
         while (current != null) {
             final ViewGroup.LayoutParams params = current.getLayoutParams();
-            if (params instanceof CoordinatorLayout.LayoutParams && ((CoordinatorLayout.LayoutParams) params).getBehavior() instanceof BottomSheetBehavior2) {
+            if (params instanceof CoordinatorLayout.LayoutParams && ((CoordinatorLayout.LayoutParams) params).getBehavior() instanceof ViewPager2BottomSheetBehavior) {
                 return current;
             }
             final ViewParent parent = current.getParent();
