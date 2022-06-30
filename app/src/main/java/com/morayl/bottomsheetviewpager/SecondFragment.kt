@@ -49,9 +49,10 @@ class SecondFragment : Fragment() {
     }
 
     private fun setup() {
-        val vp = SecondPagerAdapter(this, 2)
+        val vp = SecondPagerAdapter(this, 4)
         binding.secondViewPager.adapter = vp
         TabLayoutMediator(binding.secondTab, binding.secondViewPager) { tab, position ->
+            tab.text = "tab$position"
         }.attach()
         val bottomSheet = binding.secondBottomSheet.layoutParams as? CoordinatorLayout.LayoutParams
         footprint(bottomSheet)
