@@ -30,17 +30,17 @@ class SecondFragment : Fragment() {
     ): View? {
 
         _binding = FragmentSecondBinding.inflate(inflater, container, false)
-        val bottomSheet = binding.secondBottomSheet.layoutParams as? CoordinatorLayout.LayoutParams
-        footprint(bottomSheet)
-        val behavior = bottomSheet?.behavior as? BottomSheetBehavior<View>
-        footprint(behavior)
-        behavior?.isFitToContents = false
-        behavior?.halfExpandedRatio = 0.7f
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val bottomSheet = binding.secondBottomSheet.layoutParams as? CoordinatorLayout.LayoutParams
+        footprint(bottomSheet)
+        val behavior = bottomSheet?.behavior as? ViewPager2BottomSheetBehavior<View>
+        footprint(behavior)
+        behavior?.isFitToContents = false
+        behavior?.halfExpandedRatio = 0.7f
 
         setup()
         binding.buttonSecond.setOnClickListener {
